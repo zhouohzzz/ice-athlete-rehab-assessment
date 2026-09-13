@@ -82,26 +82,26 @@ rehab_rules = {
 # 损伤部位可选
 injury_sites = ["无损伤","膝关节","踝关节","肩关节","腰部","髋关节","腕部"]
 
-# ========== PDF生成函数 ==========
+# ========== PDF生成函数【已修复所有减号BUG】 ==========
 def generate_pdf(athlete, score, level, radar_data, advice):
     buf = io.BytesIO()
     c = canvas.Canvas(buf,pagesize=A4)
     width, height = A4
     c.setFont(FONT_CN,18)
-    c.drawCentredString(width/2, height‑40, "冰雪运动员智能康复风险评估报告")
+    c.drawCentredString(width/2, height-40, "冰雪运动员智能康复风险评估报告")
     c.setFont(FONT_CN,11)
-    c.drawString(40, height‑70, f"评估编号：{athlete['eval_id']}")
-    c.drawString(40, height‑90, f"运动员姓名：{athlete['name']}")
-    c.drawString(40, height‑110, f"运动项目：{athlete['sport']}")
-    c.drawString(40, height‑130, f"损伤部位：{athlete['site']}")
-    c.drawString(40, height‑150, f"评估日期：{datetime.now().strftime('%Y‑%m‑%d %H:%M')}")
-    c.drawString(40, height‑180, f"康复风险得分：{score:.2f} /100")
+    c.drawString(40, height-70, f"评估编号：{athlete['eval_id']}")
+    c.drawString(40, height-90, f"运动员姓名：{athlete['name']}")
+    c.drawString(40, height-110, f"运动项目：{athlete['sport']}")
+    c.drawString(40, height-130, f"损伤部位：{athlete['site']}")
+    c.drawString(40, height-150, f"评估日期：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    c.drawString(40, height-180, f"康复风险得分：{score:.2f} /100")
     c.setFillColor(colors.darkblue)
     c.setFont(FONT_CN,14)
-    c.drawString(40, height‑210,f"风险等级：{level}")
+    c.drawString(40, height-210,f"风险等级：{level}")
     c.setFont(FONT_CN,11)
-    c.drawString(40, height‑250,"===== 康复参考方案 =====")
-    y = height‑275
+    c.drawString(40, height-250,"===== 康复参考方案 =====")
+    y = height-275
     for line in [advice["load"],advice["physio"],advice["warning"]]:
         c.drawString(40,y,line)
         y -=22
@@ -136,7 +136,7 @@ if nav == "🏃 运动员档案管理":
     with col2:
         notes = st.text_area("备注（伤病史、既往手术等）")
         if st.button("✅ 保存运动员档案"):
-            new_id = f"ATH‑{len(st.session_state.athlete_list)+1:04d}"
+            new_id = f"ATH-{len(st.session_state.athlete_list)+1:04d}"
             ath = {
                 "ath_id":new_id,
                 "name":name,
@@ -221,7 +221,7 @@ elif nav == "📝 康复风险单次评估":
             his_rec = [r for r in st.session_state.eval_records if r["ath_id"]==ath_id]
             if len(his_rec)>0:
                 last = his_rec[-1]
-                delta = total_risk‑last["score"]
+                delta = total_risk-last["score"]
                 col_a,col_b = st.columns(2)
                 with col_a:
                     st.metric("本次风险分",f"{total_risk:.2f}",delta=f"{delta:.2f}")
@@ -231,12 +231,12 @@ elif nav == "📝 康复风险单次评估":
                 st.info("暂无该运动员历史评估记录")
 
             if st.button("💾保存本次评估记录"):
-                eval_id = f"EVAL‑{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                eval_id = f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
                 rec = {
                     "eval_id":eval_id,
                     "ath_id":ath["ath_id"],
                     "name":ath["name"],
-                    "time":datetime.now().strftime("%Y‑%m‑%d %H:%M"),
+                    "time":datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "score":total_risk,
                     "level":risk_level,
                     "scores_raw":scores_raw.tolist()
@@ -263,8 +263,8 @@ elif nav == "📝 康复风险单次评估":
             }
             c = site_color_map.get(ath["site"],"#eeeeee")
             st.markdown(f'''
-            <div style="width:320px;height:420px;background:{c};border‑radius:16px;margin:auto;
-            display:flex;align‑items:center;justify‑content:center;font‑size:22px">
+            <div style="width:320px;height:420px;background:{c};border-radius:16px;margin:auto;
+            display:flex;align-items:center;justify-content:center;font-size:22px">
             损伤部位：{ath["site"]}<br>色块颜色越深代表该部位损伤风险越高
             </div>
             ''',unsafe_allow_html=True)
@@ -275,7 +275,7 @@ elif nav == "📝 康复风险单次评估":
             st.download_button(
                 label="📥下载PDF评估报告",
                 data=pdf_bytes,
-                file_name=f"康复评估_{ath['name']}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                file_name=f"康复评估_{ath['name']}_{datetime.now().strftime('%Y-%m-%d')}.pdf",
                 mime="application/pdf"
             )
 
@@ -293,7 +293,7 @@ elif nav == "📈 历史记录 & 康复趋势":
         subdf["time_dt"]=pd.to_datetime(subdf["time"])
         subdf = subdf.sort_values("time_dt")
         fig_trend = px.line(subdf,x="time_dt",y="score",title=f"{sel_name}康复风险变化趋势",
-                            markers=True,labels={"score":"风险得分(0‑100)","time_dt":"评估时间"})
+                            markers=True,labels={"score":"风险得分(0-100)","time_dt":"评估时间"})
         fig_trend.update_layout(yaxis_range=[0,100])
         st.plotly_chart(fig_trend,use_container_width=True)
 
@@ -317,7 +317,7 @@ elif nav == "⚙️ AHP指标敏感性分析":
     new_s = np.sum(sample_score * w_norm)*100
     col_s1,col_s2 = st.columns(2)
     col_s1.metric("默认权重基准风险分",f"{base:.2f}")
-    col_s2.metric("调整权重后风险分",f"{new_s:.2f}",delta=f"{new_s‑base:.2f}")
+    col_s2.metric("调整权重后风险分",f"{new_s:.2f}",delta=f"{new_s-base:.2f}")
     fig_sens = go.Figure()
     fig_sens.add_trace(go.Bar(x=weight_names,y=w_norm))
     fig_sens.update_layout(title="当前自定义AHP权重分布")
@@ -343,7 +343,7 @@ elif nav == "📊 全队批量评估与看板":
             df_br = pd.DataFrame(batch_res)
             st.dataframe(df_br,use_container_width=True)
             st.download_button("📥下载批量评估结果CSV",
-                              df_br.to_csv(index=False).encode("utf‑8‑sig"),
+                              df_br.to_csv(index=False).encode("utf-8-sig"),
                               file_name="全队评估结果.csv")
             # 统计看板
             st.divider()
@@ -357,11 +357,11 @@ elif nav == "📊 全队批量评估与看板":
             st.error("CSV缺少必要表头，请检查格式")
     st.info("批量CSV模板：name,pain,rom,strength,prev_inj,balance,anxiety,load")
     template_csv = "name,pain,rom,strength,prev_inj,balance,anxiety,load\n运动员A,4,3,2,1,2,2,3\n运动员B,7,6,5,3,4,2,5"
-    st.download_button("📄下载CSV模板",template_csv.encode("utf‑8‑sig"),file_name="批量导入模板.csv")
+    st.download_button("📄下载CSV模板",template_csv.encode("utf-8-sig"),file_name="批量导入模板.csv")
 
 st.markdown("""
 <br>
-<div style='text‑align:center;color:#666;font‑size:13px'>
+<div style='text-align:center;color:#666;font-size:13px'>
 冰雪运动员智能康复评估系统｜原型仅供竞赛演示，不可替代临床诊断
 </div>
 """,unsafe_allow_html=True)
