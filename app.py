@@ -3,8 +3,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
-from fpdf import FPDF
-from io import BytesIO
 
 # ===================== 【页面全局配置，必须放在所有代码最顶部！】=====================
 st.set_page_config(
@@ -115,34 +113,6 @@ def get_risk_level(score):
 
 risk_name, risk_color, risk_suggest = get_risk_level(comprehensive_score)
 
-# PDF生成函数
-def generate_pdf(ath_id, name, sport, injury_site, indicator_scores, comprehensive_score, risk_name, risk_suggest):
-    pdf = FPDF('P','mm','A4')
-    pdf.add_page()
-    pdf.add_font("SimHei", "", "SimHei.ttf", uni=True)
-    pdf.set_font("SimHei", "", 16)
-    pdf.cell(0,12,"冰雪运动员康复评估报告", ln=True, align='C')
-    pdf.ln(5)
-    pdf.set_font("SimHei", "", 11)
-    pdf.cell(0,8,f"评估时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",ln=True)
-    pdf.cell(0,8,f"运动员编号：{ath_id}",ln=True)
-    pdf.cell(0,8,f"姓名：{name}",ln=True)
-    pdf.cell(0,8,f"冰雪项目：{sport}",ln=True)
-    pdf.cell(0,8,f"损伤部位：{injury_site}",ln=True)
-    pdf.ln(4)
-    pdf.cell(0,8,"——————评估指标详情——————",ln=True)
-    for k,v in indicator_scores.items():
-        pdf.cell(0,8,f"{k}：{v}",ln=True)
-    pdf.ln(4)
-    pdf.cell(0,8,f"综合风险得分：{comprehensive_score:.2f}",ln=True)
-    pdf.cell(0,8,f"风险等级：{risk_name}",ln=True)
-    pdf.cell(0,8,f"康复干预建议：{risk_suggest}",ln=True)
-
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    return buffer
-
 # ===================== 主页面 =====================
 st.title("❄️冰雪运动员智能康复评估系统")
 st.markdown("基于AHP层次分析法+模糊综合评价的损伤康复风险评估平台",unsafe_allow_html=True)
@@ -245,12 +215,4 @@ with tab3:
         data=report_text,
         file_name=f"{ath_id}_{name}_康复评估报告.txt",
         mime="text/plain"
-    )
-    # PDF下载按钮
-    pdf_bytes = generate_pdf(ath_id, name, sport, injury_site, indicator_scores, comprehensive_score, risk_name, risk_suggest)
-    st.download_button(
-        label="📄下载PDF评估报告",
-        data=pdf_bytes,
-        file_name=f"{ath_id}_{name}_康复评估报告.pdf",
-        mime="application/pdf"
     )
