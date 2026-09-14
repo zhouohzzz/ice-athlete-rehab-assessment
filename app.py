@@ -29,34 +29,7 @@ st.set_page_config(
 pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
 FONT_CN = 'STSong-Light'
 
-# ===================== 全局高级CSS注入（美化原生组件） =====================
-st.markdown("""
-<style>
-    html, body {font-family: "Microsoft YaHei", sans-serif;}
-    .stTabs [data-baseweb="tab-list"] {gap:8px;}
-    .stTabs [data-baseweb="tab"] {
-        padding:6px 16px;
-        border-radius:6px;
-        background-color:#f0f4f9;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color:#4078c0 !important;
-        color:white !important;
-    }
-    .card{
-        padding:1.2rem;
-        border-radius:10px;
-        background:white;
-        box-shadow: 0 2px 8px #00000018;
-        margin-bottom:15px;
-    }
-    .risk-high{background:#ffe9e9;color:#992222}
-    .risk-mid{background:#fff8e9;color:#886600}
-    .risk-low{background:#e9f9ee;color:#187038}
-</style>
-""", unsafe_allow=True)
-
-# ========== PDF生成函数【修复KeyError版本】 ==========
+# ========== PDF生成函数 ==========
 def generate_pdf(athlete, score, level, radar_data, advice):
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
@@ -64,7 +37,6 @@ def generate_pdf(athlete, score, level, radar_data, advice):
     c.setFont(FONT_CN,18)
     c.drawCentredString(width/2, height-40, "冰雪运动员智能康复风险评估报告")
     c.setFont(FONT_CN,11)
-    # 动态生成评估编号，不再读取athlete['eval_id']
     temp_eval_id = f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     c.drawString(40, height-70, f"评估编号：{temp_eval_id}")
     c.drawString(40, height-90, f"运动员编号：{athlete['ath_id']}")
@@ -190,9 +162,15 @@ tab1, tab2, tab3 = st.tabs(["📊评估结果","📐算法公式","📄导出报
 with tab1:
     col1, col2 = st.columns([1,1])
     with col1:
-        st.markdown(f"<div class='card'><h3>综合风险评估结果</h3>",unsafe_allow=True)
+        st.subheader("综合风险评估结果")
         st.metric(label="综合风险总分", value=f"{total:.2f}")
-        st.markdown(f"<div class='card risk-{risk_text[0:2]}'><h3>风险等级：{risk_text}</h3></div>",unsafe_allow=True)
+        # 原生st.info/st.warning/st.success替代自定义css卡片
+        if risk_text == "高风险":
+            st.error(f"风险等级：{risk_text}")
+        elif risk_text == "中风险":
+            st.warning(f"风险等级：{risk_text}")
+        else:
+            st.success(f"风险等级：{risk_text}")
         st.subheader("康复指导方案")
         st.write(advice_dict["load"])
         st.write(advice_dict["physio"])
