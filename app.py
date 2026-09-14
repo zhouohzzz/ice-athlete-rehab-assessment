@@ -10,7 +10,7 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.lib import colors
 import io
 
-# ===================== 【页面全局配置，必须放在所有代码最顶部！】=====================
+# ===================== 页面全局配置，必须放在最顶部 =====================
 st.set_page_config(
     page_title="冰雪运动员智能康复评估系统",
     page_icon="❄️",
@@ -25,7 +25,7 @@ st.set_page_config(
     }
 )
 
-# 注册中文字体（PDF中文不乱码）
+# 注册PDF中文字体
 pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
 FONT_CN = 'STSong-Light'
 
@@ -151,9 +151,9 @@ fig_radar.add_trace(go.Scatterpolar(
 ))
 fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True,range=[0,100])),height=400)
 
-# ===================== 主页面 =====================
-st.markdown("<h1 style='text-align:center'>❄️冰雪运动员智能康复评估系统</h1>", unsafe_allow=True)
-st.markdown("<p style='text-align:center'>基于AHP层次分析+模糊综合评价的损伤康复风险评估平台</p>", unsafe_allow=True)
+# ===================== 主页面【全部原生组件，无任何HTML标签！】 =====================
+st.title("❄️冰雪运动员智能康复评估系统")
+st.subheader("基于AHP层次分析+模糊综合评价的损伤康复风险评估平台")
 st.divider()
 
 tab1, tab2, tab3 = st.tabs(["📊评估结果","📐算法公式","📄导出报告"])
@@ -164,7 +164,7 @@ with tab1:
     with col1:
         st.subheader("综合风险评估结果")
         st.metric(label="综合风险总分", value=f"{total:.2f}")
-        # 原生st.info/st.warning/st.success替代自定义css卡片
+        # 原生三色提示框
         if risk_text == "高风险":
             st.error(f"风险等级：{risk_text}")
         elif risk_text == "中风险":
@@ -192,7 +192,7 @@ with tab1:
         st.subheader("各指标雷达图")
         st.plotly_chart(fig_radar,use_container_width=True)
 
-# Tab2 算法公式（答辩展示）
+# Tab2 算法公式（答辩展示，LaTeX公式保留，st.markdown纯文本无HTML）
 with tab2:
     st.markdown(r"""
 ### 1. AHP加权综合评分模型
