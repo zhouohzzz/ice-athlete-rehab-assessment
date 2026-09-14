@@ -3,6 +3,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
+from fpdf import FPDF
+from io import BytesIO
 
 # ===================== 【页面全局配置，必须放在所有代码最顶部！】=====================
 st.set_page_config(
@@ -36,7 +38,7 @@ st.markdown("""
 </style>
 """,unsafe_allow_html=True)
 
-# ===================== 侧边栏 运动员信息录入【全部空白，滑块初始0】 =====================
+# ===================== 侧边栏 运动员信息录入【全部输入框默认空白 + 滑块实时显示数值】 =====================
 with st.sidebar:
     st.header("❄️ 运动员信息录入")
     ath_id = st.text_input("运动员编号", value="")
@@ -45,12 +47,43 @@ with st.sidebar:
     injury_site = st.text_input("损伤部位", value="")
     st.divider()
     st.subheader("康复评估指标(0~100)")
-    vas = st.slider("疼痛VAS评分",0,100,0)
-    rom = st.slider("关节活动度",0,100,0)
-    muscle = st.slider("肌力恢复水平",0,100,0)
-    balance = st.slider("运动失衡评估",0,100,0)
-    past_injury = st.slider("既往损伤程度",0,100,0)
-    anxiety = st.slider("心理焦虑评分",0,100,0)
+
+    # 滑块 + 同行展示当前数值
+    col_slide1, col_val1 = st.columns([4,1])
+    with col_slide1:
+        vas = st.slider("疼痛VAS评分",0,100,35)
+    with col_val1:
+        st.markdown(f"**{vas}**")
+
+    col_slide2, col_val2 = st.columns([4,1])
+    with col_slide2:
+        rom = st.slider("关节活动度",0,100,68)
+    with col_val2:
+        st.markdown(f"**{rom}**")
+
+    col_slide3, col_val3 = st.columns([4,1])
+    with col_slide3:
+        muscle = st.slider("肌力恢复水平",0,100,62)
+    with col_val3:
+        st.markdown(f"**{muscle}**")
+
+    col_slide4, col_val4 = st.columns([4,1])
+    with col_slide4:
+        balance = st.slider("运动失衡评估",0,100,72)
+    with col_val4:
+        st.markdown(f"**{balance}**")
+
+    col_slide5, col_val5 = st.columns([4,1])
+    with col_slide5:
+        past_injury = st.slider("既往损伤程度",0,100,30)
+    with col_val5:
+        st.markdown(f"**{past_injury}**")
+
+    col_slide6, col_val6 = st.columns([4,1])
+    with col_slide6:
+        anxiety = st.slider("心理焦虑评分",0,100,40)
+    with col_val6:
+        st.markdown(f"**{anxiety}**")
 
 # 指标字典同步更新名称，雷达图自动同步
 indicator_scores = {
@@ -81,6 +114,34 @@ def get_risk_level(score):
         return "极高风险", "#8b0000", "禁止冰雪运动，临床康复介入治疗"
 
 risk_name, risk_color, risk_suggest = get_risk_level(comprehensive_score)
+
+# PDF生成函数
+def generate_pdf(ath_id, name, sport, injury_site, indicator_scores, comprehensive_score, risk_name, risk_suggest):
+    pdf = FPDF('P','mm','A4')
+    pdf.add_page()
+    pdf.add_font("SimHei", "", "SimHei.ttf", uni=True)
+    pdf.set_font("SimHei", "", 16)
+    pdf.cell(0,12,"冰雪运动员康复评估报告", ln=True, align='C')
+    pdf.ln(5)
+    pdf.set_font("SimHei", "", 11)
+    pdf.cell(0,8,f"评估时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",ln=True)
+    pdf.cell(0,8,f"运动员编号：{ath_id}",ln=True)
+    pdf.cell(0,8,f"姓名：{name}",ln=True)
+    pdf.cell(0,8,f"冰雪项目：{sport}",ln=True)
+    pdf.cell(0,8,f"损伤部位：{injury_site}",ln=True)
+    pdf.ln(4)
+    pdf.cell(0,8,"——————评估指标详情——————",ln=True)
+    for k,v in indicator_scores.items():
+        pdf.cell(0,8,f"{k}：{v}",ln=True)
+    pdf.ln(4)
+    pdf.cell(0,8,f"综合风险得分：{comprehensive_score:.2f}",ln=True)
+    pdf.cell(0,8,f"风险等级：{risk_name}",ln=True)
+    pdf.cell(0,8,f"康复干预建议：{risk_suggest}",ln=True)
+
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
 
 # ===================== 主页面 =====================
 st.title("❄️冰雪运动员智能康复评估系统")
@@ -184,4 +245,12 @@ with tab3:
         data=report_text,
         file_name=f"{ath_id}_{name}_康复评估报告.txt",
         mime="text/plain"
+    )
+    # PDF下载按钮
+    pdf_bytes = generate_pdf(ath_id, name, sport, injury_site, indicator_scores, comprehensive_score, risk_name, risk_suggest)
+    st.download_button(
+        label="📄下载PDF评估报告",
+        data=pdf_bytes,
+        file_name=f"{ath_id}_{name}_康复评估报告.pdf",
+        mime="application/pdf"
     )
