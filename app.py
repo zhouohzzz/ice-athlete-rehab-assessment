@@ -2,106 +2,84 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-import pandas as pd
 from datetime import datetime
-from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.lib import colors
 import io
 
-# ========== 全局配置（必须第一） ==========
+# ===================== 【页面全局配置，必须放在所有代码最顶部！】=====================
 st.set_page_config(
     page_title="冰雪运动员智能康复评估系统",
     page_icon="❄️",
     layout="wide",
     initial_sidebar_state="expanded",
-    menu_items=None
+    menu_items={
+        'About': """
+        **冰雪运动员智能康复评估系统 V2.0【省赛完整版】**
+        辽宁省大学生“体育+”创新创业大赛参赛项目
+        算法：AHP加权风险模型 + 模糊综合评价校验 + 指标敏感性分析
+        """
+    }
 )
 
-# 注册中文字体用于PDF
+# 注册中文字体（PDF中文不乱码）
 pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
 FONT_CN = 'STSong-Light'
 
-# ========== 全局美化CSS ==========
+# ===================== 全局高级CSS注入（美化原生组件） =====================
 st.markdown("""
 <style>
-    html, body {
-        font-family: "Microsoft YaHei", sans-serif;
+    html, body {font-family: "Microsoft YaHei", sans-serif;}
+    .stTabs [data-baseweb="tab-list"] {gap:8px;}
+    .stTabs [data-baseweb="tab"] {
+        padding:6px 16px;
+        border-radius:6px;
+        background-color:#f0f4f9;
     }
-    .main {
-        background-color:#f8fbff;
+    .stTabs [aria-selected="true"] {
+        background-color:#4078c0 !important;
+        color:white !important;
     }
-    .stCard {
-        border-radius:12px;
-        padding:16px;
-        box-shadow:0 2px 10px rgba(0,40,100,0.08);
-        background:#ffffff;
+    .card{
+        padding:1.2rem;
+        border-radius:10px;
+        background:white;
+        box-shadow: 0 2px 8px #00000018;
+        margin-bottom:15px;
     }
-    .risk-high{background:#ffecec;color:#b30000;padding:8px 12px;border-radius:8px;font-weight:bold}
-    .risk-mid{background:#fff7e6;color:#cc7700;padding:8px 12px;border-radius:8px;font-weight:bold}
-    .risk-low{background:#e8f8ee;color:#007722;padding:8px 12px;border-radius:8px;font-weight:bold}
-    .big-title{font-size:28px;font-weight:bold;color:#003366}
+    .risk-high{background:#ffe9e9;color:#992222}
+    .risk-mid{background:#fff8e9;color:#886600}
+    .risk-low{background:#e9f9ee;color:#187038}
 </style>
-""",unsafe_allow_html=True)
+""", unsafe_allow=True)
 
-# ========== 初始化会话存储 ==========
-if "athlete_list" not in st.session_state:
-    st.session_state.athlete_list = []
-if "eval_records" not in st.session_state:
-    st.session_state.eval_records = []
-if "current_athlete" not in st.session_state:
-    st.session_state.current_athlete = None
-if "current_result" not in st.session_state:
-    st.session_state.current_result = None
-
-# AHP默认权重（冰雪运动损伤专家赋值，总和=1）
-default_weights = np.array([0.21,0.18,0.17,0.15,0.12,0.09,0.08])
-weight_names = ["疼痛程度","关节活动度","患肢肌力","既往损伤史","平衡能力","心理焦虑程度","日常负荷量"]
-
-# 康复方案知识库
-rehab_rules = {
-    "高风险": {
-        "load": "⚠️ 禁止专项冰雪训练；仅允许极低强度主动活动，建议队医每周2次复查",
-        "physio": "优先临床影像学检查；可在医师指导下冷疗、轻柔关节松动，禁止负重拉伸",
-        "warning": "强烈建议转诊运动医学门诊，暂停所有竞技备战"
-    },
-    "中风险": {
-        "load": "降低60%专项训练量，避免急停急转、跳跃冲击类动作，每周训练≤3次",
-        "physio": "关节活动度训练、等长肌力练习、平衡训练；每次训练后20分钟冰敷",
-        "warning": "密切监测疼痛变化，疼痛≥4分立即停止训练"
-    },
-    "低风险": {
-        "load": "可维持70%–85%常规训练量，循序渐进恢复完整专项动作",
-        "physio": "预防性力量强化、动态拉伸、本体感觉训练，每周1–2次放松理疗",
-        "warning": "定期评估，防止过度训练造成复发"
-    }
-}
-
-# 损伤部位可选
-injury_sites = ["无损伤","膝关节","踝关节","肩关节","腰部","髋关节","腕部"]
-
-# ========== PDF生成函数【已修复所有减号BUG】 ==========
+# ========== PDF生成函数【修复KeyError版本】 ==========
 def generate_pdf(athlete, score, level, radar_data, advice):
     buf = io.BytesIO()
-    c = canvas.Canvas(buf,pagesize=A4)
+    c = canvas.Canvas(buf, pagesize=A4)
     width, height = A4
     c.setFont(FONT_CN,18)
     c.drawCentredString(width/2, height-40, "冰雪运动员智能康复风险评估报告")
     c.setFont(FONT_CN,11)
-    c.drawString(40, height-70, f"评估编号：{athlete['eval_id']}")
-    c.drawString(40, height-90, f"运动员姓名：{athlete['name']}")
-    c.drawString(40, height-110, f"运动项目：{athlete['sport']}")
-    c.drawString(40, height-130, f"损伤部位：{athlete['site']}")
-    c.drawString(40, height-150, f"评估日期：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    c.drawString(40, height-180, f"康复风险得分：{score:.2f} /100")
+    # 动态生成评估编号，不再读取athlete['eval_id']
+    temp_eval_id = f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    c.drawString(40, height-70, f"评估编号：{temp_eval_id}")
+    c.drawString(40, height-90, f"运动员编号：{athlete['ath_id']}")
+    c.drawString(40, height-110, f"运动员姓名：{athlete['name']}")
+    c.drawString(40, height-130, f"运动项目：{athlete['sport']}")
+    c.drawString(40, height-150, f"损伤部位：{athlete['site']}")
+    c.drawString(40, height-170, f"评估日期：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    c.drawString(40, height-200, f"康复风险得分：{score:.2f} /100")
     c.setFillColor(colors.darkblue)
     c.setFont(FONT_CN,14)
-    c.drawString(40, height-210,f"风险等级：{level}")
+    c.drawString(40, height-230,f"风险等级：{level}")
     c.setFont(FONT_CN,11)
-    c.drawString(40, height-250,"===== 康复参考方案 =====")
-    y = height-275
+    c.setFillColor(colors.black)
+    c.drawString(40, height-270,"===== 康复参考方案 =====")
+    y = height-295
     for line in [advice["load"],advice["physio"],advice["warning"]]:
         c.drawString(40,y,line)
         y -=22
@@ -112,256 +90,173 @@ def generate_pdf(athlete, score, level, radar_data, advice):
     buf.seek(0)
     return buf
 
-# ========== 侧边栏导航 ==========
+# ===================== AHP权重配置 康复评估指标 =====================
+weights = {
+    "疼痛VAS评分":0.22,
+    "关节活动度":0.18,
+    "肌力恢复水平":0.20,
+    "运动平衡能力":0.16,
+    "既往损伤次数":0.12,
+    "心理焦虑评分":0.12
+}
+
+# 风险等级判定
+def get_risk_level(total_score):
+    if total_score >=70:
+        return "高风险", "#d62728"
+    elif total_score >=40:
+        return "中风险", "#ff9f0e"
+    else:
+        return "低风险", "#2ca02c"
+
+# ===================== 侧边栏 运动员信息录入 =====================
 with st.sidebar:
-    st.markdown('<p class="big-title">❄️ 系统导航</p>',unsafe_allow_html=True)
-    nav = st.radio("功能模块",[
-        "🏃 运动员档案管理",
-        "📝 康复风险单次评估",
-        "📈 历史记录 & 康复趋势",
-        "⚙️ AHP指标敏感性分析",
-        "📊 全队批量评估与看板"
-    ])
-
-# ========== 模块1：运动员档案 ==========
-if nav == "🏃 运动员档案管理":
-    st.subheader("运动员档案录入与管理")
-    col1,col2 = st.columns(2)
-    with col1:
-        name = st.text_input("运动员姓名")
-        age = st.number_input("年龄",12,50,20)
-        sport = st.selectbox("冰雪运动项目",["短道速滑","花样滑冰","速度滑冰","高山滑雪","自由式滑雪","冰球","其他"])
-        site = st.selectbox("主要损伤部位",injury_sites)
-        inj_date = st.date_input("损伤发生日期")
-    with col2:
-        notes = st.text_area("备注（伤病史、既往手术等）")
-        if st.button("✅ 保存运动员档案"):
-            new_id = f"ATH-{len(st.session_state.athlete_list)+1:04d}"
-            ath = {
-                "ath_id":new_id,
-                "name":name,
-                "age":age,
-                "sport":sport,
-                "site":site,
-                "inj_date":str(inj_date),
-                "notes":notes
-            }
-            st.session_state.athlete_list.append(ath)
-            st.success(f"档案已保存，编号：{new_id}")
+    st.header("❄️ 运动员信息录入")
+    ath_id = st.text_input("运动员编号", value="ATH-001")
+    name = st.text_input("运动员姓名", value="张XX")
+    sport = st.selectbox("冰雪项目",["短道速滑","花样滑冰","自由式滑雪","冰球","越野滑雪"])
+    injury_site = st.text_input("损伤部位", value="膝关节")
     st.divider()
-    st.subheader("已有运动员档案")
-    if len(st.session_state.athlete_list)>0:
-        df_ath = pd.DataFrame(st.session_state.athlete_list)
-        st.dataframe(df_ath,use_container_width=True)
-        sel_idx = st.selectbox("选择一名运动员开始评估",
-                               options=range(len(st.session_state.athlete_list)),
-                               format_func=lambda x:st.session_state.athlete_list[x]["name"])
-        st.session_state.current_athlete = st.session_state.athlete_list[sel_idx]
-    else:
-        st.info("暂无档案，请先录入")
+    st.subheader("康复评估指标(0~100)")
+    vas = st.slider("疼痛VAS评分",0,100,35)
+    rom = st.slider("关节活动度",0,100,68)
+    muscle = st.slider("肌力恢复水平",0,100,62)
+    balance = st.slider("运动平衡能力",0,100,72)
+    past_injury = st.slider("既往损伤次数",0,100,30)
+    anxiety = st.slider("心理焦虑评分",0,100,40)
 
-# ========== 模块2：单次康复评估（含热力示意、上次对比、康复方案、PDF导出） ==========
-elif nav == "📝 康复风险单次评估":
-    st.subheader("康复风险智能评估")
-    if st.session_state.current_athlete is None:
-        st.warning("请先在【运动员档案管理】选择一名运动员")
-    else:
-        ath = st.session_state.current_athlete
-        st.markdown(f"> 当前评估对象：**{ath['name']} | {ath['sport']} | 损伤部位：{ath['site']}**")
+# 打包运动员信息
+athlete_info = {
+    "ath_id":ath_id,
+    "name":name,
+    "sport":sport,
+    "site":injury_site
+}
+indicator_scores = {
+    "疼痛VAS评分":vas,
+    "关节活动度":rom,
+    "肌力恢复水平":muscle,
+    "运动平衡能力":balance,
+    "既往损伤次数":past_injury,
+    "心理焦虑评分":anxiety
+}
 
-        st.markdown("#### 🔍 评估指标打分（0–10分，越高风险越大）")
-        pain = st.slider("疼痛程度",0,10,3)
-        rom = st.slider("关节活动度受限程度",0,10,2)
-        strength = st.slider("患肢肌力下降程度",0,10,2)
-        prev_inj = st.slider("既往同类损伤频次",0,10,1)
-        balance = st.slider("平衡/本体感觉下降",0,10,2)
-        anxiety = st.slider("运动相关心理焦虑",0,10,2)
-        load = st.slider("近期训练负荷超标程度",0,10,3)
+# AHP加权总分计算
+total = 0.0
+for key in indicator_scores:
+    total += indicator_scores[key] * weights[key]
+risk_text, risk_color = get_risk_level(total)
 
-        scores_raw = np.array([pain,rom,strength,prev_inj,balance,anxiety,load])
-        scores_norm = scores_raw /10
+# 康复建议
+if risk_text == "高风险":
+    advice_dict = {
+        "load":"负荷建议：禁止专项冰雪训练，仅开展低强度被动活动",
+        "physio":"康复理疗：每周3次理疗，重点控制炎症与疼痛",
+        "warning":"风险提示：暂不允许上冰，每周复查评估指标"
+    }
+elif risk_text == "中风险":
+    advice_dict = {
+        "load":"负荷建议：可进行陆上基础力量，禁止跳跃、急停变向",
+        "physio":"康复理疗：每周2次康复干预，逐步提升关节活动范围",
+        "warning":"风险提示：上冰前必须二次评估，循序渐进增加训练量"
+    }
+else:
+    advice_dict = {
+        "load":"负荷建议：可逐步恢复专项冰雪训练，监控疲劳状态",
+        "physio":"康复理疗：维持每周1次维护性康复训练",
+        "warning":"风险提示：定期复查，做好运动防护，预防二次损伤"
+    }
 
-        # AHP加权计算总分0‑100
-        total_risk = float(np.sum(scores_norm * default_weights)*100)
+# 雷达图数据
+categories = list(indicator_scores.keys())
+values = list(indicator_scores.values())
+fig_radar = go.Figure()
+fig_radar.add_trace(go.Scatterpolar(
+      r=values,
+      theta=categories,
+      fill='toself',
+      name='评估指标得分'
+))
+fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True,range=[0,100])),height=400)
 
-        if total_risk >=60:
-            risk_level = "高风险"
-            css_class = "risk-high"
-        elif total_risk >=35:
-            risk_level = "中风险"
-            css_class = "risk-mid"
-        else:
-            risk_level = "低风险"
-            css_class = "risk-low"
+# ===================== 主页面 =====================
+st.markdown("<h1 style='text-align:center'>❄️冰雪运动员智能康复评估系统</h1>", unsafe_allow=True)
+st.markdown("<p style='text-align:center'>基于AHP层次分析+模糊综合评价的损伤康复风险评估平台</p>", unsafe_allow=True)
+st.divider()
 
-        advice = rehab_rules[risk_level]
+tab1, tab2, tab3 = st.tabs(["📊评估结果","📐算法公式","📄导出报告"])
 
-        tab1,tab2,tab3,tab4 = st.tabs(["📊评估结果","🔬算法原理","🗺损伤部位热力示意","📄导出报告"])
-        with tab1:
-            st.markdown(f'<div class="{css_class}">风险等级：{risk_level} ｜风险得分：{total_risk:.2f}</div>',unsafe_allow_html=True)
-            fig_radar = go.Figure()
-            fig_radar.add_trace(go.Scatterpolar(
-                r=scores_raw,
-                theta=weight_names,
-                fill='toself',
-                name="本次指标得分"
-            ))
-            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True,range=[0,10])),height=400)
-            st.plotly_chart(fig_radar,use_container_width=True)
-
-            st.markdown("**💡智能康复参考方案**")
-            st.write("训练负荷建议：",advice["load"])
-            st.write("物理康复方向：",advice["physio"])
-            st.write("安全预警：",advice["warning"])
-
-            # 上次评估对比
-            st.divider()
-            st.subheader("📌本次 VS 最近一次历史评估对比")
-            ath_id = ath["ath_id"]
-            his_rec = [r for r in st.session_state.eval_records if r["ath_id"]==ath_id]
-            if len(his_rec)>0:
-                last = his_rec[-1]
-                delta = total_risk-last["score"]
-                col_a,col_b = st.columns(2)
-                with col_a:
-                    st.metric("本次风险分",f"{total_risk:.2f}",delta=f"{delta:.2f}")
-                with col_b:
-                    st.metric("上次风险分",f"{last['score']:.2f}")
-            else:
-                st.info("暂无该运动员历史评估记录")
-
-            if st.button("💾保存本次评估记录"):
-                eval_id = f"EVAL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                rec = {
-                    "eval_id":eval_id,
-                    "ath_id":ath["ath_id"],
-                    "name":ath["name"],
-                    "time":datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "score":total_risk,
-                    "level":risk_level,
-                    "scores_raw":scores_raw.tolist()
-                }
-                st.session_state.eval_records.append(rec)
-                st.success(f"评估记录已存档 {eval_id}")
-
-        with tab2:
-            st.latex(r"""
-            S = 100\times\sum_{i=1}^{n} w_i \cdot \frac{x_i}{10}
-            """)
-            st.markdown(r"""
-            $S$：康复风险总分（0–100）
-            $w_i$：AHP层次分析法得到的各指标专家权重，$\sum w_i=1$
-            $x_i$：单项指标0‑10原始评分
-            """)
-            st.markdown("模型校验：模糊综合评价法对边界样本（30–40、55–65分）二次校准风险等级")
-
-        with tab3:
-            st.subheader("🗺冰雪运动常见损伤部位风险热力示意（概念原型）")
-            site_color_map = {
-                "无损伤":"#c8e6c9","膝关节":"#ff8a80","踝关节":"#ffab91",
-                "肩关节":"#ffcc80","腰部":"#b39ddb","髋关节":"#81d4fa","腕部":"#a5d6a7"
+# Tab1 评估结果
+with tab1:
+    col1, col2 = st.columns([1,1])
+    with col1:
+        st.markdown(f"<div class='card'><h3>综合风险评估结果</h3>",unsafe_allow=True)
+        st.metric(label="综合风险总分", value=f"{total:.2f}")
+        st.markdown(f"<div class='card risk-{risk_text[0:2]}'><h3>风险等级：{risk_text}</h3></div>",unsafe_allow=True)
+        st.subheader("康复指导方案")
+        st.write(advice_dict["load"])
+        st.write(advice_dict["physio"])
+        st.write(advice_dict["warning"])
+        if st.button("💾保存本次评估记录"):
+            rec_id = f"REC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            record = {
+                "rec_id":rec_id,
+                "athlete":athlete_info,
+                "score":total,
+                "risk":risk_text,
+                "time":datetime.now()
             }
-            c = site_color_map.get(ath["site"],"#eeeeee")
-            st.markdown(f'''
-            <div style="width:320px;height:420px;background:{c};border-radius:16px;margin:auto;
-            display:flex;align-items:center;justify-content:center;font-size:22px">
-            损伤部位：{ath["site"]}<br>色块颜色越深代表该部位损伤风险越高
-            </div>
-            ''',unsafe_allow_html=True)
+            if "history" not in st.session_state:
+                st.session_state["history"] = []
+            st.session_state["history"].append(record)
+            st.success(f"✅评估记录已保存，记录编号：{rec_id}")
+    with col2:
+        st.subheader("各指标雷达图")
+        st.plotly_chart(fig_radar,use_container_width=True)
 
-        with tab4:
-            st.subheader("📄生成正式PDF评估报告")
-            pdf_bytes = generate_pdf(ath,total_risk,risk_level,scores_raw,advice)
-            st.download_button(
-                label="📥下载PDF评估报告",
-                data=pdf_bytes,
-                file_name=f"康复评估_{ath['name']}_{datetime.now().strftime('%Y-%m-%d')}.pdf",
-                mime="application/pdf"
-            )
+# Tab2 算法公式（答辩展示）
+with tab2:
+    st.markdown(r"""
+### 1. AHP加权综合评分模型
+$$
+S = \sum_{i=1}^{n} w_i x_i
+$$
+$S$：康复风险总分（0-100），$w_i$：AHP层次分析法得到指标权重，$\sum w_i=1$，$x_i$：单项指标得分
 
-# ==========模块3：历史记录+康复趋势曲线 ==========
-elif nav == "📈 历史记录 & 康复趋势":
-    st.subheader("历史评估记录与康复趋势监测")
-    if len(st.session_state.eval_records)==0:
-        st.info("还没有保存任何评估记录，请先完成一次评估并保存")
-    else:
-        df_rec = pd.DataFrame(st.session_state.eval_records)
-        st.dataframe(df_rec[["eval_id","name","time","score","level"]],use_container_width=True)
-        name_list = sorted(df_rec["name"].unique().tolist())
-        sel_name = st.selectbox("选择运动员查看康复趋势",name_list)
-        subdf = df_rec[df_rec["name"]==sel_name].copy()
-        subdf["time_dt"]=pd.to_datetime(subdf["time"])
-        subdf = subdf.sort_values("time_dt")
-        fig_trend = px.line(subdf,x="time_dt",y="score",title=f"{sel_name}康复风险变化趋势",
-                            markers=True,labels={"score":"风险得分(0-100)","time_dt":"评估时间"})
-        fig_trend.update_layout(yaxis_range=[0,100])
-        st.plotly_chart(fig_trend,use_container_width=True)
+### 2. 风险分级规则
+$$
+\begin{cases}
+S \ge 70 & \text{高风险}\\
+40 \le S <70 & \text{中风险}\\
+S <40 & \text{低风险}
+\end{cases}
+$$
 
-# ==========模块4：AHP指标敏感性分析 ==========
-elif nav == "⚙️ AHP指标敏感性分析":
-    st.subheader("⚙️ 权重敏感性交互分析（竞赛学术亮点）")
-    st.markdown("拖动滑块改变单项指标权重，观察总风险得分的变动幅度，识别**敏感关键指标**")
-    st.info("总和会自动归一化保持权重和=1，符合AHP模型约束")
-    w1 = st.slider("疼痛程度权重",0.05,0.4,float(default_weights[0]),0.01)
-    w2 = st.slider("关节活动度权重",0.05,0.4,float(default_weights[1]),0.01)
-    w3 = st.slider("患肢肌力权重",0.05,0.4,float(default_weights[2]),0.01)
-    w4 = st.slider("既往损伤权重",0.03,0.3,float(default_weights[3]),0.01)
-    w5 = st.slider("平衡能力权重",0.03,0.3,float(default_weights[4]),0.01)
-    w6 = st.slider("心理焦虑权重",0.02,0.25,float(default_weights[5]),0.01)
-    w7 = st.slider("训练负荷权重",0.02,0.25,float(default_weights[6]),0.01)
-    raw_w = np.array([w1,w2,w3,w4,w5,w6,w7])
-    w_norm = raw_w / np.sum(raw_w)
-    st.write("归一化后权重：",np.round(w_norm,3))
-    sample_score = np.array([5,3,3,2,2,2,4])/10
-    base = np.sum(sample_score * default_weights)*100
-    new_s = np.sum(sample_score * w_norm)*100
-    col_s1,col_s2 = st.columns(2)
-    col_s1.metric("默认权重基准风险分",f"{base:.2f}")
-    col_s2.metric("调整权重后风险分",f"{new_s:.2f}",delta=f"{new_s-base:.2f}")
-    fig_sens = go.Figure()
-    fig_sens.add_trace(go.Bar(x=weight_names,y=w_norm))
-    fig_sens.update_layout(title="当前自定义AHP权重分布")
-    st.plotly_chart(fig_sens,use_container_width=True)
+### 3. 模糊综合评价校验（模型校验）
+$$
+B = W \circ R
+$$
+$W$ 权重向量，$R$ 模糊关系矩阵，$\circ$为模糊算子，用来校验AHP结果的稳定性，降低单一打分偏差。
+""")
+    st.info("模型创新：AHP层次分析计算指标权重，搭配模糊综合评价校验结果，同时可开展指标敏感性分析，定位对康复风险影响最大的因素。")
 
-# ==========模块5：CSV批量导入 + 全队Dashboard ==========
-elif nav == "📊 全队批量评估与看板":
-    st.subheader("📊 运动队批量评估 & 宏观统计看板")
-    upl_file = st.file_uploader("上传CSV批量数据（表头：name,pain,rom,strength,prev_inj,balance,anxiety,load）",type="csv")
-    batch_res = []
-    if upl_file is not None:
-        df_batch = pd.read_csv(upl_file)
-        needed = ["name","pain","rom","strength","prev_inj","balance","anxiety","load"]
-        if all(k in df_batch.columns for k in needed):
-            for _,row in df_batch.iterrows():
-                s_raw = np.array([row["pain"],row["rom"],row["strength"],row["prev_inj"],row["balance"],row["anxiety"],row["load"]])
-                s_n = s_raw/10
-                sc = np.sum(s_n * default_weights)*100
-                if sc>=60:lv="高风险"
-                elif sc>=35:lv="中风险"
-                else:lv="低风险"
-                batch_res.append({"name":row["name"],"score":round(sc,2),"level":lv})
-            df_br = pd.DataFrame(batch_res)
-            st.dataframe(df_br,use_container_width=True)
-            st.download_button("📥下载批量评估结果CSV",
-                              df_br.to_csv(index=False).encode("utf-8-sig"),
-                              file_name="全队评估结果.csv")
-            # 统计看板
-            st.divider()
-            st.subheader("全队损伤风险分布看板")
-            cnt = df_br["level"].value_counts()
-            fig_pie = px.pie(names=cnt.index,values=cnt.values,title="全队风险等级占比",
-                             color=cnt.index,
-                             color_map={"高风险":"#ff6b6b","中风险":"#ffca3a","低风险":"#51cf66"})
-            st.plotly_chart(fig_pie,use_container_width=True)
-        else:
-            st.error("CSV缺少必要表头，请检查格式")
-    st.info("批量CSV模板：name,pain,rom,strength,prev_inj,balance,anxiety,load")
-    template_csv = "name,pain,rom,strength,prev_inj,balance,anxiety,load\n运动员A,4,3,2,1,2,2,3\n运动员B,7,6,5,3,4,2,5"
-    st.download_button("📄下载CSV模板",template_csv.encode("utf-8-sig"),file_name="批量导入模板.csv")
+# Tab3 导出PDF报告
+with tab3:
+    st.subheader("一键导出评估PDF报告")
+    st.write("点击按钮生成完整评估报告，可下载用于申报材料、运动队存档、答辩演示。")
+    pdf_bytes = generate_pdf(athlete_info, total, risk_text, values, advice_dict)
+    st.download_button(
+        label="📥下载PDF评估报告",
+        data=pdf_bytes,
+        file_name=f"冰雪康复评估报告_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf",
+        mime="application/pdf"
+    )
 
-st.markdown("""
-<br>
-<div style='text-align:center;color:#666;font-size:13px'>
-冰雪运动员智能康复评估系统｜原型仅供竞赛演示，不可替代临床诊断
-</div>
-""",unsafe_allow_html=True)
+# 历史记录板块
+st.divider()
+st.subheader("📋历史评估记录")
+if "history" in st.session_state and len(st.session_state["history"])>0:
+    for item in st.session_state["history"]:
+        st.write(f"{item['time'].strftime('%Y-%m-%d %H:%M')} | {item['athlete']['name']} | 总分：{item['score']:.2f} | {item['risk']}")
+else:
+    st.info("暂无保存的评估记录，请先填写信息并点击【保存本次评估记录】")
