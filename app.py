@@ -36,28 +36,21 @@ st.markdown("""
 </style>
 """,unsafe_allow_html=True)
 
-# ===================== 侧边栏 运动员信息录入【全部输入框默认空白】 =====================
+# ===================== 侧边栏 运动员信息录入【全部空白，滑块初始0】 =====================
 with st.sidebar:
     st.header("❄️ 运动员信息录入")
     ath_id = st.text_input("运动员编号", value="")
     name = st.text_input("运动员姓名", value="")
-
-    # 冰雪项目：文本输入框，默认空白
     sport = st.text_input("冰雪项目", value="")
-
     injury_site = st.text_input("损伤部位", value="")
     st.divider()
     st.subheader("康复评估指标(0~100)")
-    vas = st.slider("疼痛VAS评分",0,100,35)
-    rom = st.slider("关节活动度",0,100,68)
-    muscle = st.slider("肌力恢复水平",0,100,62)
-
-    # 运动平衡能力 → 运动失衡评估
-    balance = st.slider("运动失衡评估",0,100,72)
-    # 既往损伤次数 → 既往损伤程度
-    past_injury = st.slider("既往损伤程度",0,100,30)
-
-    anxiety = st.slider("心理焦虑评分",0,100,40)
+    vas = st.slider("疼痛VAS评分",0,100,0)
+    rom = st.slider("关节活动度",0,100,0)
+    muscle = st.slider("肌力恢复水平",0,100,0)
+    balance = st.slider("运动失衡评估",0,100,0)
+    past_injury = st.slider("既往损伤程度",0,100,0)
+    anxiety = st.slider("心理焦虑评分",0,100,0)
 
 # 指标字典同步更新名称，雷达图自动同步
 indicator_scores = {
