@@ -36,16 +36,16 @@ st.markdown("""
 </style>
 """,unsafe_allow_html=True)
 
-# ===================== 侧边栏 运动员信息录入【已按你的要求修改】 =====================
+# ===================== 侧边栏 运动员信息录入【全部输入框默认空白】 =====================
 with st.sidebar:
     st.header("❄️ 运动员信息录入")
-    ath_id = st.text_input("运动员编号", value="ATH-001")
-    name = st.text_input("运动员姓名", value="张XX")
+    ath_id = st.text_input("运动员编号", value="")
+    name = st.text_input("运动员姓名", value="")
 
-    # 冰雪项目：下拉改为手动输入文本框
-    sport = st.text_input("冰雪项目", value="短道速滑")
+    # 冰雪项目：文本输入框，默认空白
+    sport = st.text_input("冰雪项目", value="")
 
-    injury_site = st.text_input("损伤部位", value="膝关节")
+    injury_site = st.text_input("损伤部位", value="")
     st.divider()
     st.subheader("康复评估指标(0~100)")
     vas = st.slider("疼痛VAS评分",0,100,35)
